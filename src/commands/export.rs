@@ -12,11 +12,11 @@ pub fn run(format: &ExportFormat, output: Option<&str>, status: Option<&str>) ->
     let tasks = db.list_tasks(status, None, None, None, Some("created"), None)?;
 
     let content = match format {
-        ExportFormat::Json => {
-            serde_json::to_string_pretty(&tasks)?
-        }
+        ExportFormat::Json => serde_json::to_string_pretty(&tasks)?,
         ExportFormat::Csv => {
-            let mut out = String::from("id,title,status,priority,branch,base_branch,assignee,created_at,updated_at\n");
+            let mut out = String::from(
+                "id,title,status,priority,branch,base_branch,assignee,created_at,updated_at\n",
+            );
             for t in &tasks {
                 out.push_str(&format!(
                     "{},\"{}\",{},{},{},{},{},{},{}\n",

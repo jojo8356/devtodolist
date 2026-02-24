@@ -1,5 +1,7 @@
 use colored::Colorize;
-use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, ContentArrangement, Table};
+use comfy_table::{
+    Cell, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL,
+};
 
 use crate::models::*;
 
@@ -58,7 +60,7 @@ pub fn print_task_table(tasks: &[Task]) {
             Cell::new(
                 task.priority
                     .as_ref()
-                    .map(|p| colorize_priority(p))
+                    .map(colorize_priority)
                     .unwrap_or_else(|| "-".dimmed().to_string()),
             ),
             Cell::new(task.branch.as_deref().unwrap_or("-")),
@@ -134,7 +136,11 @@ pub fn print_comments(comments: &[Comment]) {
             "    {} {} ({})",
             c.author.bold(),
             c.created_at.format("%Y-%m-%d %H:%M").to_string().dimmed(),
-            if c.remote_id.is_some() { "remote" } else { "local" }
+            if c.remote_id.is_some() {
+                "remote"
+            } else {
+                "local"
+            }
         );
         println!("      {}", c.body);
     }
@@ -150,11 +156,7 @@ pub fn print_labels_table(labels: &[Label]) {
     table
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_header(vec![
-            Cell::new("ID"),
-            Cell::new("Name"),
-            Cell::new("Color"),
-        ]);
+        .set_header(vec![Cell::new("ID"), Cell::new("Name"), Cell::new("Color")]);
 
     for label in labels {
         table.add_row(vec![

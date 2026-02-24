@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use reqwest::Client;
+use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use serde::Deserialize;
 
 use super::{CreatePrRequest, ProviderApi, RemoteComment, RemotePr, RemoteReviewer};
@@ -122,16 +122,15 @@ impl ProviderApi for GithubProvider {
             _ => "open",
         };
 
-        let url = format!(
-            "https://api.github.com/repos/{repo}/pulls?state={gh_state}&per_page=100"
-        );
+        let url =
+            format!("https://api.github.com/repos/{repo}/pulls?state={gh_state}&per_page=100");
 
         let resp = self
             .build_request(&url)
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
 
         let prs: Vec<GhPr> = resp.json().await?;
 
@@ -140,25 +139,26 @@ impl ProviderApi for GithubProvider {
             .map(|pr| {
                 let status = pr.to_status_string();
                 RemotePr {
-                remote_id: pr.number,
-                title: pr.title,
-                description: pr.body,
-                status,
-                branch: Some(pr.head.ref_name),
-                base_branch: Some(pr.base.ref_name),
-                source_url: pr.html_url,
-                author: Some(pr.user.login),
-                labels: pr.labels.into_iter().map(|l| l.name).collect(),
-                reviewers: pr
-                    .requested_reviewers
-                    .into_iter()
-                    .map(|u| RemoteReviewer {
-                        username: u.login,
-                        status: "pending".to_string(),
-                    })
-                    .collect(),
-                comments: vec![],
-            }})
+                    remote_id: pr.number,
+                    title: pr.title,
+                    description: pr.body,
+                    status,
+                    branch: Some(pr.head.ref_name),
+                    base_branch: Some(pr.base.ref_name),
+                    source_url: pr.html_url,
+                    author: Some(pr.user.login),
+                    labels: pr.labels.into_iter().map(|l| l.name).collect(),
+                    reviewers: pr
+                        .requested_reviewers
+                        .into_iter()
+                        .map(|u| RemoteReviewer {
+                            username: u.login,
+                            status: "pending".to_string(),
+                        })
+                        .collect(),
+                    comments: vec![],
+                }
+            })
             .collect())
     }
 
@@ -170,31 +170,28 @@ impl ProviderApi for GithubProvider {
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
         let pr: GhPr = resp.json().await?;
 
         // Fetch reviews
-        let reviews_url = format!(
-            "https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
-        );
+        let reviews_url = format!("https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews");
         let reviews_resp = self
             .build_request(&reviews_url)
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
         let reviews: Vec<GhReview> = reviews_resp.json().await?;
 
         // Fetch comments
-        let comments_url = format!(
-            "https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
-        );
+        let comments_url =
+            format!("https://api.github.com/repos/{repo}/issues/{pr_number}/comments");
         let comments_resp = self
             .build_request(&comments_url)
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
         let comments: Vec<GhComment> = comments_resp.json().await?;
 
         let status = pr.to_status_string();
@@ -248,7 +245,7 @@ impl ProviderApi for GithubProvider {
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
 
         let pr: GhPr = resp.json().await?;
 
@@ -307,9 +304,8 @@ impl ProviderApi for GithubProvider {
             "closed" => serde_json::json!({"state": "closed"}),
             "open" | "draft" | "review" => serde_json::json!({"state": "open"}),
             "merged" => {
-                let merge_url = format!(
-                    "https://api.github.com/repos/{repo}/pulls/{pr_number}/merge"
-                );
+                let merge_url =
+                    format!("https://api.github.com/repos/{repo}/pulls/{pr_number}/merge");
                 let mut req = self.client.put(&merge_url);
                 for (k, v) in self.headers() {
                     req = req.header(k, v);
@@ -317,7 +313,7 @@ impl ProviderApi for GithubProvider {
                 req.send()
                     .await?
                     .error_for_status()
-                    .map_err(|e| DevTodoError::Api(e))?;
+                    .map_err(DevTodoError::Api)?;
                 return Ok(());
             }
             _ => return Err(DevTodoError::InvalidStatus(status.to_string())),
@@ -331,7 +327,7 @@ impl ProviderApi for GithubProvider {
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use reqwest::header::USER_AGENT;
 use reqwest::Client;
+use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 
 use super::{CreatePrRequest, ProviderApi, RemoteComment, RemotePr, RemoteReviewer};
@@ -134,7 +134,7 @@ impl ProviderApi for GitlabProvider {
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
 
         let mrs: Vec<GlMr> = resp.json().await?;
 
@@ -143,18 +143,19 @@ impl ProviderApi for GitlabProvider {
             .map(|mr| {
                 let status = mr.to_status_string();
                 RemotePr {
-                remote_id: mr.iid,
-                title: mr.title,
-                description: mr.description,
-                status,
-                branch: Some(mr.source_branch),
-                base_branch: Some(mr.target_branch),
-                source_url: mr.web_url,
-                author: Some(mr.author.username),
-                labels: mr.labels,
-                reviewers: vec![],
-                comments: vec![],
-            }})
+                    remote_id: mr.iid,
+                    title: mr.title,
+                    description: mr.description,
+                    status,
+                    branch: Some(mr.source_branch),
+                    base_branch: Some(mr.target_branch),
+                    source_url: mr.web_url,
+                    author: Some(mr.author.username),
+                    labels: mr.labels,
+                    reviewers: vec![],
+                    comments: vec![],
+                }
+            })
             .collect())
     }
 
@@ -162,15 +163,13 @@ impl ProviderApi for GitlabProvider {
         let project = self.encode_project(repo);
 
         // Fetch MR
-        let url = self.api_url(&format!(
-            "/projects/{project}/merge_requests/{mr_iid}"
-        ));
+        let url = self.api_url(&format!("/projects/{project}/merge_requests/{mr_iid}"));
         let resp = self
             .build_get(&url)
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
         let mr: GlMr = resp.json().await?;
 
         // Fetch approvals
@@ -199,25 +198,25 @@ impl ProviderApi for GitlabProvider {
         let notes_url = self.api_url(&format!(
             "/projects/{project}/merge_requests/{mr_iid}/notes?per_page=100"
         ));
-        let comments: Vec<RemoteComment> =
-            if let Ok(resp) = self.build_get(&notes_url).send().await {
-                if let Ok(notes) = resp.json::<Vec<GlNote>>().await {
-                    notes
-                        .into_iter()
-                        .filter(|n| !n.system)
-                        .map(|n| RemoteComment {
-                            remote_id: n.id,
-                            author: n.author.username,
-                            body: n.body,
-                            created_at: n.created_at,
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                }
+        let comments: Vec<RemoteComment> = if let Ok(resp) = self.build_get(&notes_url).send().await
+        {
+            if let Ok(notes) = resp.json::<Vec<GlNote>>().await {
+                notes
+                    .into_iter()
+                    .filter(|n| !n.system)
+                    .map(|n| RemoteComment {
+                        remote_id: n.id,
+                        author: n.author.username,
+                        body: n.body,
+                        created_at: n.created_at,
+                    })
+                    .collect()
             } else {
                 vec![]
-            };
+            }
+        } else {
+            vec![]
+        };
 
         let status = mr.to_status_string();
         Ok(RemotePr {
@@ -267,7 +266,7 @@ impl ProviderApi for GitlabProvider {
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| DevTodoError::Api(e))?;
+            .map_err(DevTodoError::Api)?;
 
         let mr: GlMr = resp.json().await?;
 
@@ -299,29 +298,25 @@ impl ProviderApi for GitlabProvider {
                     .send()
                     .await?
                     .error_for_status()
-                    .map_err(|e| DevTodoError::Api(e))?;
+                    .map_err(DevTodoError::Api)?;
             }
             "closed" => {
-                let url = self.api_url(&format!(
-                    "/projects/{project}/merge_requests/{mr_iid}"
-                ));
+                let url = self.api_url(&format!("/projects/{project}/merge_requests/{mr_iid}"));
                 self.build_put(&url)
                     .json(&serde_json::json!({"state_event": "close"}))
                     .send()
                     .await?
                     .error_for_status()
-                    .map_err(|e| DevTodoError::Api(e))?;
+                    .map_err(DevTodoError::Api)?;
             }
             "open" | "review" => {
-                let url = self.api_url(&format!(
-                    "/projects/{project}/merge_requests/{mr_iid}"
-                ));
+                let url = self.api_url(&format!("/projects/{project}/merge_requests/{mr_iid}"));
                 self.build_put(&url)
                     .json(&serde_json::json!({"state_event": "reopen"}))
                     .send()
                     .await?
                     .error_for_status()
-                    .map_err(|e| DevTodoError::Api(e))?;
+                    .map_err(DevTodoError::Api)?;
             }
             _ => return Err(DevTodoError::InvalidStatus(status.to_string())),
         }

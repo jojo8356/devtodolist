@@ -12,7 +12,7 @@ pub struct RemotePr {
     pub remote_id: i64,
     pub title: String,
     pub description: Option<String>,
-    pub status: String,       // provider-native status string
+    pub status: String, // provider-native status string
     pub branch: Option<String>,
     pub base_branch: Option<String>,
     pub source_url: String,

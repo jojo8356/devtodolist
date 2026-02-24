@@ -85,7 +85,9 @@ impl std::str::FromStr for Priority {
             "medium" => Ok(Self::Medium),
             "high" => Ok(Self::High),
             "critical" => Ok(Self::Critical),
-            other => Err(crate::error::DevTodoError::InvalidPriority(other.to_string())),
+            other => Err(crate::error::DevTodoError::InvalidPriority(
+                other.to_string(),
+            )),
         }
     }
 }

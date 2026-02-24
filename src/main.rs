@@ -54,11 +54,7 @@ async fn main() {
             *limit,
         ),
 
-        Commands::Show {
-            id,
-            comments,
-            json,
-        } => commands::show::run(*id, *comments, *json),
+        Commands::Show { id, comments, json } => commands::show::run(*id, *comments, *json),
 
         Commands::Edit {
             id,

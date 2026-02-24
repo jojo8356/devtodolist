@@ -11,19 +11,11 @@ pub fn run(command: &LabelCommands) -> Result<()> {
     match command {
         LabelCommands::Add { name, color } => {
             db.insert_label(name, color.as_deref())?;
-            println!(
-                "{} Created label '{}'",
-                "✓".green().bold(),
-                name.bold()
-            );
+            println!("{} Created label '{}'", "✓".green().bold(), name.bold());
         }
         LabelCommands::Remove { name } => {
             db.delete_label(name)?;
-            println!(
-                "{} Removed label '{}'",
-                "✓".green().bold(),
-                name.bold()
-            );
+            println!("{} Removed label '{}'", "✓".green().bold(), name.bold());
         }
         LabelCommands::List => {
             let labels = db.list_labels()?;

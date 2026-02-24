@@ -48,7 +48,9 @@ pub fn run(
             id.to_string().bold()
         );
     } else {
-        println!("Nothing to update. Use --title, --description, --priority, --branch, or --assignee.");
+        println!(
+            "Nothing to update. Use --title, --description, --priority, --branch, or --assignee."
+        );
     }
 
     Ok(())

@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::{DevTodoError, Result};
 use crate::models::*;
@@ -69,6 +69,7 @@ impl Database {
 
     // ── Tasks ──
 
+    #[allow(clippy::too_many_arguments)]
     pub fn insert_task(
         &self,
         title: &str,
@@ -112,15 +113,15 @@ impl Database {
         sort: Option<&str>,
         limit: Option<u32>,
     ) -> Result<Vec<Task>> {
-        let mut sql = String::from(
-            "SELECT DISTINCT t.* FROM tasks t"
-        );
+        let mut sql = String::from("SELECT DISTINCT t.* FROM tasks t");
         let mut conditions: Vec<String> = Vec::new();
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
         let mut param_idx = 1;
 
         if label.is_some() {
-            sql.push_str(" JOIN task_labels tl ON t.id = tl.task_id JOIN labels l ON tl.label_id = l.id");
+            sql.push_str(
+                " JOIN task_labels tl ON t.id = tl.task_id JOIN labels l ON tl.label_id = l.id",
+            );
         }
 
         if let Some(s) = status {
@@ -176,11 +177,21 @@ impl Database {
 
     pub fn update_task_field(&self, id: i64, field: &str, value: Option<&str>) -> Result<()> {
         let allowed = [
-            "title", "description", "status", "priority", "branch",
-            "base_branch", "assignee", "provider", "remote_id", "source_url",
+            "title",
+            "description",
+            "status",
+            "priority",
+            "branch",
+            "base_branch",
+            "assignee",
+            "provider",
+            "remote_id",
+            "source_url",
         ];
         if !allowed.contains(&field) {
-            return Err(DevTodoError::Config(format!("Cannot update field: {field}")));
+            return Err(DevTodoError::Config(format!(
+                "Cannot update field: {field}"
+            )));
         }
 
         let sql = format!(
@@ -194,7 +205,9 @@ impl Database {
     }
 
     pub fn delete_task(&self, id: i64) -> Result<()> {
-        let affected = self.conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+        let affected = self
+            .conn
+            .execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
         if affected == 0 {
             return Err(DevTodoError::NotFound("Task".into(), id.to_string()));
         }
@@ -228,7 +241,9 @@ impl Database {
     }
 
     pub fn list_labels(&self) -> Result<Vec<Label>> {
-        let mut stmt = self.conn.prepare("SELECT id, name, color FROM labels ORDER BY name")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, color FROM labels ORDER BY name")?;
         let rows = stmt.query_map([], |row| {
             Ok(Label {
                 id: row.get(0)?,
@@ -387,9 +402,9 @@ impl Database {
     }
 
     pub fn count_by_priority(&self) -> Result<Vec<(String, i64)>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT COALESCE(priority, 'none'), COUNT(*) FROM tasks GROUP BY priority",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT COALESCE(priority, 'none'), COUNT(*) FROM tasks GROUP BY priority")?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
@@ -433,7 +448,9 @@ impl Database {
 /// Helper to create an in-memory database for testing.
 #[cfg(test)]
 fn test_db() -> Database {
-    let db = Database { conn: Connection::open_in_memory().unwrap() };
+    let db = Database {
+        conn: Connection::open_in_memory().unwrap(),
+    };
     db.conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
     db.init().unwrap();
     db
@@ -475,7 +492,15 @@ mod tests {
     fn insert_and_get_task() {
         let db = test_db();
         let id = db
-            .insert_task("Fix login bug", Some("Details here"), &TaskStatus::Open, Some(&Priority::High), Some("fix/login"), Some("main"), Some("alice"))
+            .insert_task(
+                "Fix login bug",
+                Some("Details here"),
+                &TaskStatus::Open,
+                Some(&Priority::High),
+                Some("fix/login"),
+                Some("main"),
+                Some("alice"),
+            )
             .unwrap();
         assert_eq!(id, 1);
 
@@ -498,9 +523,12 @@ mod tests {
     #[test]
     fn update_task_field() {
         let db = test_db();
-        let id = db.insert_task("Task", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("Task", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
 
-        db.update_task_field(id, "title", Some("Updated title")).unwrap();
+        db.update_task_field(id, "title", Some("Updated title"))
+            .unwrap();
         db.update_task_field(id, "status", Some("review")).unwrap();
 
         let task = db.get_task(id).unwrap();
@@ -511,14 +539,26 @@ mod tests {
     #[test]
     fn update_invalid_field_rejected() {
         let db = test_db();
-        let id = db.insert_task("Task", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("Task", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
         assert!(db.update_task_field(id, "evil_field", Some("x")).is_err());
     }
 
     #[test]
     fn delete_task() {
         let db = test_db();
-        let id = db.insert_task("To delete", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task(
+                "To delete",
+                None,
+                &TaskStatus::Draft,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
         db.delete_task(id).unwrap();
         assert!(db.get_task(id).is_err());
     }
@@ -532,7 +572,9 @@ mod tests {
     #[test]
     fn delete_task_cascades_labels() {
         let db = test_db();
-        let id = db.insert_task("Task", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("Task", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
         db.insert_label("bug", None).unwrap();
         db.assign_label(id, "bug").unwrap();
 
@@ -554,14 +596,21 @@ mod tests {
     #[test]
     fn list_tasks_filter_by_status() {
         let db = test_db();
-        db.insert_task("A", None, &TaskStatus::Open, None, None, None, None).unwrap();
-        db.insert_task("B", None, &TaskStatus::Draft, None, None, None, None).unwrap();
-        db.insert_task("C", None, &TaskStatus::Open, None, None, None, None).unwrap();
+        db.insert_task("A", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
+        db.insert_task("B", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
+        db.insert_task("C", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
 
-        let open = db.list_tasks(Some("open"), None, None, None, None, None).unwrap();
+        let open = db
+            .list_tasks(Some("open"), None, None, None, None, None)
+            .unwrap();
         assert_eq!(open.len(), 2);
 
-        let draft = db.list_tasks(Some("draft"), None, None, None, None, None).unwrap();
+        let draft = db
+            .list_tasks(Some("draft"), None, None, None, None, None)
+            .unwrap();
         assert_eq!(draft.len(), 1);
     }
 
@@ -569,9 +618,20 @@ mod tests {
     fn list_tasks_with_limit() {
         let db = test_db();
         for i in 0..10 {
-            db.insert_task(&format!("Task {i}"), None, &TaskStatus::Open, None, None, None, None).unwrap();
+            db.insert_task(
+                &format!("Task {i}"),
+                None,
+                &TaskStatus::Open,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
         }
-        let tasks = db.list_tasks(None, None, None, None, None, Some(3)).unwrap();
+        let tasks = db
+            .list_tasks(None, None, None, None, None, Some(3))
+            .unwrap();
         assert_eq!(tasks.len(), 3);
     }
 
@@ -604,7 +664,9 @@ mod tests {
     #[test]
     fn assign_and_unassign_label() {
         let db = test_db();
-        let id = db.insert_task("T", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("T", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
         db.insert_label("bug", None).unwrap();
         db.insert_label("feature", None).unwrap();
 
@@ -623,7 +685,9 @@ mod tests {
     #[test]
     fn assign_label_idempotent() {
         let db = test_db();
-        let id = db.insert_task("T", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("T", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
         db.insert_label("bug", None).unwrap();
         db.assign_label(id, "bug").unwrap();
         db.assign_label(id, "bug").unwrap(); // INSERT OR IGNORE
@@ -634,13 +698,19 @@ mod tests {
     #[test]
     fn filter_tasks_by_label() {
         let db = test_db();
-        let id1 = db.insert_task("A", None, &TaskStatus::Open, None, None, None, None).unwrap();
-        let _id2 = db.insert_task("B", None, &TaskStatus::Open, None, None, None, None).unwrap();
+        let id1 = db
+            .insert_task("A", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
+        let _id2 = db
+            .insert_task("B", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
 
         db.insert_label("bug", None).unwrap();
         db.assign_label(id1, "bug").unwrap();
 
-        let tasks = db.list_tasks(None, None, None, Some("bug"), None, None).unwrap();
+        let tasks = db
+            .list_tasks(None, None, None, Some("bug"), None, None)
+            .unwrap();
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].title, "A");
     }
@@ -650,7 +720,9 @@ mod tests {
     #[test]
     fn reviewer_crud() {
         let db = test_db();
-        let id = db.insert_task("T", None, &TaskStatus::Review, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("T", None, &TaskStatus::Review, None, None, None, None)
+            .unwrap();
 
         db.assign_reviewer(id, "alice").unwrap();
         db.assign_reviewer(id, "bob").unwrap();
@@ -659,7 +731,8 @@ mod tests {
         assert_eq!(reviewers.len(), 2);
         assert_eq!(reviewers[0].status, ReviewStatus::Pending);
 
-        db.update_review_status(id, "alice", &ReviewStatus::Approved).unwrap();
+        db.update_review_status(id, "alice", &ReviewStatus::Approved)
+            .unwrap();
         let reviewers = db.list_reviewers(id).unwrap();
         let alice = reviewers.iter().find(|r| r.username == "alice").unwrap();
         assert_eq!(alice.status, ReviewStatus::Approved);
@@ -673,7 +746,9 @@ mod tests {
     #[test]
     fn remove_reviewer_not_found() {
         let db = test_db();
-        let id = db.insert_task("T", None, &TaskStatus::Draft, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("T", None, &TaskStatus::Draft, None, None, None, None)
+            .unwrap();
         assert!(db.remove_reviewer(id, "nobody").is_err());
     }
 
@@ -682,7 +757,9 @@ mod tests {
     #[test]
     fn comment_crud() {
         let db = test_db();
-        let id = db.insert_task("T", None, &TaskStatus::Open, None, None, None, None).unwrap();
+        let id = db
+            .insert_task("T", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
 
         db.insert_comment(id, "alice", "Looks good").unwrap();
         db.insert_comment(id, "bob", "Needs changes").unwrap();
@@ -698,23 +775,37 @@ mod tests {
     #[test]
     fn stats_count_by_status() {
         let db = test_db();
-        db.insert_task("A", None, &TaskStatus::Open, None, None, None, None).unwrap();
-        db.insert_task("B", None, &TaskStatus::Open, None, None, None, None).unwrap();
-        db.insert_task("C", None, &TaskStatus::Merged, None, None, None, None).unwrap();
+        db.insert_task("A", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
+        db.insert_task("B", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
+        db.insert_task("C", None, &TaskStatus::Merged, None, None, None, None)
+            .unwrap();
 
         let counts = db.count_by_status().unwrap();
-        let open_count = counts.iter().find(|(s, _)| s == "open").map(|(_, c)| *c).unwrap_or(0);
+        let open_count = counts
+            .iter()
+            .find(|(s, _)| s == "open")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
         assert_eq!(open_count, 2);
-        let merged_count = counts.iter().find(|(s, _)| s == "merged").map(|(_, c)| *c).unwrap_or(0);
+        let merged_count = counts
+            .iter()
+            .find(|(s, _)| s == "merged")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
         assert_eq!(merged_count, 1);
     }
 
     #[test]
     fn stats_oldest_open() {
         let db = test_db();
-        db.insert_task("Old", None, &TaskStatus::Open, None, None, None, None).unwrap();
-        db.insert_task("Closed", None, &TaskStatus::Closed, None, None, None, None).unwrap();
-        db.insert_task("New", None, &TaskStatus::Open, None, None, None, None).unwrap();
+        db.insert_task("Old", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
+        db.insert_task("Closed", None, &TaskStatus::Closed, None, None, None, None)
+            .unwrap();
+        db.insert_task("New", None, &TaskStatus::Open, None, None, None, None)
+            .unwrap();
 
         let oldest = db.oldest_open_tasks(5).unwrap();
         assert_eq!(oldest.len(), 2); // Only open/review/draft

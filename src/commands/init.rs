@@ -30,11 +30,10 @@ pub fn run() -> Result<()> {
     if let Ok(output) = Command::new("git")
         .args(["remote", "get-url", "origin"])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            println!("  {} {}", "Git remote detected:".dimmed(), url);
-        }
+        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        println!("  {} {}", "Git remote detected:".dimmed(), url);
     }
 
     Ok(())

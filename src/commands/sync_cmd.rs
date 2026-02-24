@@ -115,18 +115,11 @@ async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
 
     for rpr in &remote_prs {
         // Check if we already track this PR
-        let existing = db.list_tasks(
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )?;
+        let existing = db.list_tasks(None, None, None, None, None, None)?;
 
-        let local = existing.iter().find(|t| {
-            t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id)
-        });
+        let local = existing
+            .iter()
+            .find(|t| t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id));
 
         if let Some(task) = local {
             let new_status = map_remote_status(&rpr.status);
@@ -185,11 +178,7 @@ async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
     Ok(())
 }
 
-fn import_remote_pr(
-    db: &crate::db::Database,
-    provider: &Provider,
-    rpr: &RemotePr,
-) -> Result<()> {
+fn import_remote_pr(db: &crate::db::Database, provider: &Provider, rpr: &RemotePr) -> Result<()> {
     let status = map_remote_status(&rpr.status);
 
     let id = db.insert_task(
@@ -217,10 +206,10 @@ fn import_remote_pr(
     // Import reviewers
     for reviewer in &rpr.reviewers {
         db.assign_reviewer(id, &reviewer.username)?;
-        if reviewer.status != "pending" {
-            if let Ok(rs) = reviewer.status.parse() {
-                db.update_review_status(id, &reviewer.username, &rs)?;
-            }
+        if reviewer.status != "pending"
+            && let Ok(rs) = reviewer.status.parse()
+        {
+            db.update_review_status(id, &reviewer.username, &rs)?;
         }
     }
 
@@ -242,9 +231,11 @@ async fn async_push(id: i64) -> Result<()> {
     let task = db.get_task(id)?;
 
     let provider = if let Some(ref p) = task.provider {
-        (p.clone(), get_value(&format!("{}.token", p.as_str()))?.ok_or_else(|| {
-            DevTodoError::Config(format!("No token for {p}"))
-        })?)
+        (
+            p.clone(),
+            get_value(&format!("{}.token", p.as_str()))?
+                .ok_or_else(|| DevTodoError::Config(format!("No token for {p}")))?,
+        )
     } else {
         resolve_provider(None)?
     };
@@ -253,7 +244,9 @@ async fn async_push(id: i64) -> Result<()> {
     let repo = detect_repo()?;
 
     let branch = task.branch.as_deref().ok_or_else(|| {
-        DevTodoError::Config(format!("Task #{id} has no branch set. Use `devtodo edit {id} --branch <name>`"))
+        DevTodoError::Config(format!(
+            "Task #{id} has no branch set. Use `devtodo edit {id} --branch <name>`"
+        ))
     })?;
 
     let pb = ProgressBar::new_spinner();
@@ -268,7 +261,8 @@ async fn async_push(id: i64) -> Result<()> {
         pb.set_message(format!("Updating PR #{remote_id} on {}...", provider.0));
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-        api.update_pr_status(&repo, remote_id, task.status.as_str()).await?;
+        api.update_pr_status(&repo, remote_id, task.status.as_str())
+            .await?;
         pb.finish_and_clear();
 
         println!(
@@ -298,7 +292,10 @@ async fn async_push(id: i64) -> Result<()> {
             title: task.title.clone(),
             description: task.description.clone(),
             branch: branch.to_string(),
-            base_branch: task.base_branch.clone().unwrap_or_else(|| "main".to_string()),
+            base_branch: task
+                .base_branch
+                .clone()
+                .unwrap_or_else(|| "main".to_string()),
             draft: task.status == TaskStatus::Draft,
             labels,
             reviewers,
@@ -329,11 +326,7 @@ pub fn run_pull(provider_arg: Option<&str>, repo_arg: Option<&str>, state: &str)
     rt.block_on(async_pull(provider_arg, repo_arg, state))
 }
 
-async fn async_pull(
-    provider_arg: Option<&str>,
-    repo_arg: Option<&str>,
-    state: &str,
-) -> Result<()> {
+async fn async_pull(provider_arg: Option<&str>, repo_arg: Option<&str>, state: &str) -> Result<()> {
     let db = find_db()?;
     let (provider, token) = resolve_provider(provider_arg)?;
     let api = build_api(&provider, &token)?;
@@ -360,9 +353,9 @@ async fn async_pull(
     for rpr in &remote_prs {
         // Check if already tracked
         let existing = db.list_tasks(None, None, None, None, None, None)?;
-        let already = existing.iter().any(|t| {
-            t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id)
-        });
+        let already = existing
+            .iter()
+            .any(|t| t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id));
 
         if already {
             skipped += 1;
