@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 use colored::Colorize;
@@ -33,8 +32,12 @@ fn save_config(map: &BTreeMap<String, String>) -> Result<()> {
     fs::write(&path, content)?;
 
     // Set restrictive permissions (tokens security)
-    let perms = fs::Permissions::from_mode(0o600);
-    fs::set_permissions(&path, perms)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = fs::Permissions::from_mode(0o600);
+        fs::set_permissions(&path, perms)?;
+    }
 
     Ok(())
 }
