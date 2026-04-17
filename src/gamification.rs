@@ -489,7 +489,9 @@ mod tests {
     #[test]
     fn test_progress_within_level_never_exceeds_one() {
         // Anti-test: into/span ratio is always in [0, 1].
-        for xp in [0, 1, 49, 50, 199, 200, 4049, 4050, 490_049, 490_050, 1_000_000] {
+        for xp in [
+            0, 1, 49, 50, 199, 200, 4049, 4050, 490_049, 490_050, 1_000_000,
+        ] {
             let (into, span) = progress_within_level(xp);
             assert!(span > 0, "span must be positive, xp={xp}");
             assert!(into <= span, "into {into} <= span {span} (xp={xp})");
@@ -681,8 +683,21 @@ mod tests {
         assert_eq!(p.longest_streak, 30);
 
         // 7-day gap
-        let gap_day = day.succ_opt().unwrap().succ_opt().unwrap().succ_opt().unwrap()
-            .succ_opt().unwrap().succ_opt().unwrap().succ_opt().unwrap().succ_opt().unwrap();
+        let gap_day = day
+            .succ_opt()
+            .unwrap()
+            .succ_opt()
+            .unwrap()
+            .succ_opt()
+            .unwrap()
+            .succ_opt()
+            .unwrap()
+            .succ_opt()
+            .unwrap()
+            .succ_opt()
+            .unwrap()
+            .succ_opt()
+            .unwrap();
         update_streak(&mut p, gap_day);
         assert_eq!(p.current_streak, 1);
         assert_eq!(p.longest_streak, 30);

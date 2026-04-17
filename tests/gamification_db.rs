@@ -7,9 +7,7 @@ use chrono::NaiveDate;
 use rusqlite::Connection;
 
 use devtodo::db::Database;
-use devtodo::gamification::{
-    Achievement, MAX_LEVEL, Profile, award_task_completion_on,
-};
+use devtodo::gamification::{Achievement, MAX_LEVEL, Profile, award_task_completion_on};
 use devtodo::models::Priority;
 
 fn fresh_db() -> Database {
@@ -163,7 +161,10 @@ fn test_award_levels_up_flag_true_only_when_threshold_crossed() {
     award_task_completion_on(&db, Some(&Priority::Low), d(2024, 1, 4)).unwrap();
     // 40 XP total so far. One more Low → 50 → level 2.
     let crossing = award_task_completion_on(&db, Some(&Priority::Low), d(2024, 1, 5)).unwrap();
-    assert!(crossing.leveled_up, "crossing the 50 XP threshold must flip leveled_up");
+    assert!(
+        crossing.leveled_up,
+        "crossing the 50 XP threshold must flip leveled_up"
+    );
     assert_eq!(crossing.old_level, 1);
     assert_eq!(crossing.new_level, 2);
     // Next award inside level 2 does NOT flip the flag again.
@@ -186,7 +187,8 @@ fn test_award_unlocks_multiple_achievements_in_single_call() {
     };
     db.save_profile(&p).unwrap();
     // Pre-unlock First Blood + earlier badges since they'd have fired.
-    db.unlock_achievement(Achievement::FirstBlood.key()).unwrap();
+    db.unlock_achievement(Achievement::FirstBlood.key())
+        .unwrap();
 
     let reward = award_task_completion_on(&db, Some(&Priority::Medium), d(2024, 1, 7)).unwrap();
     assert!(reward.leveled_up);
