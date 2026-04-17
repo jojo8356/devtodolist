@@ -6,6 +6,7 @@ pub mod export;
 pub mod init;
 pub mod label;
 pub mod list;
+pub mod profile;
 pub mod review;
 pub mod show;
 pub mod stats;

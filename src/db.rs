@@ -1,7 +1,8 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::{DevTodoError, Result};
+use crate::gamification::{Profile, level_for_xp};
 use crate::models::*;
 
 const SCHEMA: &str = r#"
@@ -48,6 +49,24 @@ CREATE TABLE IF NOT EXISTS comments (
     body       TEXT NOT NULL,
     remote_id  INTEGER,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS gamification (
+    id                   INTEGER PRIMARY KEY CHECK (id = 1),
+    xp                   INTEGER NOT NULL DEFAULT 0,
+    level                INTEGER NOT NULL DEFAULT 1,
+    current_streak       INTEGER NOT NULL DEFAULT 0,
+    longest_streak       INTEGER NOT NULL DEFAULT 0,
+    total_completed      INTEGER NOT NULL DEFAULT 0,
+    last_completion_date TEXT
+);
+
+INSERT OR IGNORE INTO gamification (id, xp, level, current_streak, longest_streak, total_completed, last_completion_date)
+VALUES (1, 0, 1, 0, 0, 0, NULL);
+
+CREATE TABLE IF NOT EXISTS achievements_unlocked (
+    name        TEXT PRIMARY KEY,
+    unlocked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
 );
 "#;
 
@@ -442,6 +461,99 @@ impl Database {
             tasks.push(row?.map_err(|_| DevTodoError::Db(rusqlite::Error::QueryReturnedNoRows))?);
         }
         Ok(tasks)
+    }
+
+    // ── Gamification ──
+
+    /// Load the (single) gamification profile row, lazily seeding it if
+    /// the schema row is missing. The level stored in the row is trusted
+    /// only if it matches what the XP implies; otherwise it is recomputed.
+    pub fn get_profile(&self) -> Result<Profile> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO gamification (id, xp, level, current_streak, longest_streak, total_completed, last_completion_date)
+             VALUES (1, 0, 1, 0, 0, 0, NULL)",
+            [],
+        )?;
+
+        let profile = self.conn.query_row(
+            "SELECT xp, level, current_streak, longest_streak, total_completed, last_completion_date
+             FROM gamification WHERE id = 1",
+            [],
+            |row| {
+                let xp: i64 = row.get(0)?;
+                let stored_level: i64 = row.get(1)?;
+                let current_streak: i64 = row.get(2)?;
+                let longest_streak: i64 = row.get(3)?;
+                let total_completed: i64 = row.get(4)?;
+                let last_completion: Option<String> = row.get(5)?;
+
+                let last_completion_date = last_completion
+                    .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
+
+                Ok(Profile {
+                    xp,
+                    level: level_for_xp(xp).max(stored_level.max(1) as u32),
+                    current_streak: current_streak.max(0) as u32,
+                    longest_streak: longest_streak.max(0) as u32,
+                    total_completed: total_completed.max(0) as u64,
+                    last_completion_date,
+                })
+            },
+        )?;
+        Ok(profile)
+    }
+
+    pub fn save_profile(&self, profile: &Profile) -> Result<()> {
+        let last = profile
+            .last_completion_date
+            .map(|d| d.format("%Y-%m-%d").to_string());
+        self.conn.execute(
+            "UPDATE gamification
+             SET xp = ?1,
+                 level = ?2,
+                 current_streak = ?3,
+                 longest_streak = ?4,
+                 total_completed = ?5,
+                 last_completion_date = ?6
+             WHERE id = 1",
+            params![
+                profile.xp,
+                profile.level as i64,
+                profile.current_streak as i64,
+                profile.longest_streak as i64,
+                profile.total_completed as i64,
+                last,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn is_achievement_unlocked(&self, name: &str) -> Result<bool> {
+        let found: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT 1 FROM achievements_unlocked WHERE name = ?1",
+                params![name],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(found.is_some())
+    }
+
+    pub fn unlock_achievement(&self, name: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO achievements_unlocked (name) VALUES (?1)",
+            params![name],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_unlocked_achievements(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name, unlocked_at FROM achievements_unlocked ORDER BY unlocked_at")?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
     }
 }
 

@@ -10,6 +10,61 @@ Manage your dev tasks directly from the terminal with the same lifecycle as a re
 
 ---
 
+## Gamification (New)
+
+Shipping code should feel like hunting. Every merged task levels you up — from a nameless E-rank hunter to the **Monarch of Shadows**.
+
+- **Levels 1 → 100** with a quadratic XP curve (`XP for level N = 50 × (N−1)²`; level 100 at 490,050 XP).
+- **XP per merge** scales with priority:
+
+  | Priority | XP |
+  |----------|----|
+  | Critical | 100 |
+  | High     | 50 |
+  | Medium   | 25 |
+  | None     | 15 |
+  | Low      | 10 |
+
+- **Daily streaks** — close a task every day and the fire keeps burning. Miss a day and the streak resets (but your longest ever stays on record).
+- **Achievements** — ten badges from *First Blood* to *Monarch of Shadows*, unlocked automatically and stored forever.
+- **Level-up SFX** — a terminal bell fires when you rank up.
+
+```bash
+# Merge a task, gain XP, maybe level up
+devtodo status 42 merged
+
+# Check your hunter card
+devtodo profile
+```
+
+```
+╔══════════════════════════════════════╗
+║       devtodo — Hunter Profile       ║
+╚══════════════════════════════════════╝
+
+Level   42  /  100
+[████████░░░░░░░░░░]   8450 / 19600 XP   (150 to next)
+
+Current streak  12 🔥    Longest  28 🔥
+Tasks merged    127
+
+Achievements  6 / 10
+  ✓ First Blood          — Complete your first task
+  ✓ Grinder              — Merge 10 tasks
+  ✓ Workaholic           — Merge 50 tasks
+  ✓ Centurion            — Merge 100 tasks
+  ✓ Awakened             — Reach level 10
+  ✓ Week Warrior         — Maintain a 7-day streak
+  ✗ S-Rank Hunter        — Reach level 50
+  ✗ Monarch of Shadows   — Reach level 100
+  ✗ Unstoppable          — Maintain a 30-day streak
+  ✗ Shadow Army          — Maintain a 100-day streak
+```
+
+Hunter ranks are motivation — the PR-based workflow below is still the real engine. *Arise.*
+
+---
+
 ## Features
 
 - **PR-based workflow** — each task follows a pull request lifecycle
@@ -21,6 +76,7 @@ Manage your dev tasks directly from the terminal with the same lifecycle as a re
 - **Export** — JSON, CSV, Markdown
 - **Shell completions** — bash, zsh, fish
 - **Colored output** — status and priority highlighting in terminal
+- **Gamification** — level up from 1 to 100, streaks, achievements, level-up SFX
 
 ## Installation
 
@@ -95,6 +151,7 @@ devtodo stats
 | `devtodo stats` | Show statistics |
 | `devtodo export <format>` | Export tasks (json/csv/markdown) |
 | `devtodo config <subcommand>` | Manage configuration (set/get/list) |
+| `devtodo profile` | Show your hunter profile (level, XP, streaks, achievements) |
 | `devtodo completions <shell>` | Generate shell completions |
 
 ## GitHub & GitLab Integration
@@ -199,19 +256,21 @@ src/
 ├── models.rs         Data types (Task, Label, Reviewer, etc.)
 ├── error.rs          Unified error type (thiserror)
 ├── display.rs        Terminal formatting (tables, colors)
+├── gamification.rs   Levels, XP, streaks, achievements
 ├── commands/         Command implementations
 │   ├── init.rs       Database initialization
 │   ├── add.rs        Task creation
 │   ├── list.rs       Task listing with filters
 │   ├── show.rs       Task detail view
 │   ├── edit.rs       Task modification
-│   ├── status.rs     Status transitions
+│   ├── status.rs     Status transitions (awards XP on merge)
 │   ├── delete.rs     Task deletion
 │   ├── label.rs      Label management
 │   ├── review.rs     Reviewer management
 │   ├── sync_cmd.rs   Sync, push, pull
 │   ├── stats.rs      Statistics
 │   ├── export.rs     JSON/CSV/Markdown export
+│   ├── profile.rs    Hunter profile (level/XP/streaks/achievements)
 │   └── config.rs     Configuration management
 └── providers/        Remote API integrations
     ├── mod.rs        Provider trait

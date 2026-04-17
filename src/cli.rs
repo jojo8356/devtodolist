@@ -203,6 +203,9 @@ pub enum Commands {
         command: ConfigCommands,
     },
 
+    /// Show your hunter profile (level, XP, streaks, achievements)
+    Profile,
+
     /// Generate shell completions
     Completions {
         /// Shell: bash, zsh, fish

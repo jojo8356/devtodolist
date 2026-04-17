@@ -3,6 +3,7 @@ pub mod commands;
 pub mod db;
 pub mod display;
 pub mod error;
+pub mod gamification;
 pub mod models;
 pub mod providers;
 
@@ -101,6 +102,8 @@ async fn main() {
         } => commands::export::run(format, output.as_deref(), status.as_deref()),
 
         Commands::Config { command } => commands::config::run(command),
+
+        Commands::Profile => commands::profile::run(),
 
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
