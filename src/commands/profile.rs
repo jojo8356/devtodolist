@@ -1,3 +1,6 @@
+//! `devtodo profile` — renders the hunter profile (level, XP bar, streaks,
+//! achievements) using the gamification module.
+
 use colored::Colorize;
 
 use crate::commands::init::find_db;
@@ -6,6 +9,8 @@ use crate::gamification::{self, Achievement, MAX_LEVEL};
 
 const BAR_WIDTH: usize = 20;
 
+/// Entry point for `devtodo profile`. Loads the gamification profile from
+/// the database and prints a formatted summary.
 pub fn run() -> Result<()> {
     let db = find_db()?;
     let profile = db.get_profile()?;

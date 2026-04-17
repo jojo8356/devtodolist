@@ -1,18 +1,10 @@
-pub mod cli;
-pub mod commands;
-pub mod db;
-pub mod display;
-pub mod error;
-pub mod gamification;
-pub mod models;
-pub mod providers;
-
 use std::io;
 
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 
-use cli::{Cli, Commands};
+use devtodo::cli::{Cli, Commands};
+use devtodo::commands;
 
 #[tokio::main]
 async fn main() {
