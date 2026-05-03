@@ -64,6 +64,42 @@ pub enum Commands {
         #[arg(short, long)]
         assignee: Option<String>,
 
+        /// Filter by developer role (e.g. backend, frontend, devops)
+        #[arg(long)]
+        role: Option<String>,
+
+        /// Created on/after (ISO date or natural: "2025-01-01", "7d ago")
+        #[arg(long)]
+        created_from: Option<String>,
+
+        /// Created on/before
+        #[arg(long)]
+        created_to: Option<String>,
+
+        /// Updated on/after
+        #[arg(long)]
+        updated_from: Option<String>,
+
+        /// Updated on/before
+        #[arg(long)]
+        updated_to: Option<String>,
+
+        /// Only tasks that have at least one dependency
+        #[arg(long, conflicts_with = "no_deps")]
+        has_deps: bool,
+
+        /// Only tasks that have no dependencies (independent)
+        #[arg(long)]
+        no_deps: bool,
+
+        /// Only tasks blocked by an unmerged dependency
+        #[arg(long, conflicts_with = "ready")]
+        blocked: bool,
+
+        /// Only tasks whose dependencies are all merged/closed
+        #[arg(long)]
+        ready: bool,
+
         /// Sort by: created, updated, priority
         #[arg(long, default_value = "created")]
         sort: String,
@@ -206,6 +242,24 @@ pub enum Commands {
     /// Show your hunter profile (level, XP, streaks, achievements)
     Profile,
 
+    /// Manage task dependencies (DAG)
+    Deps {
+        #[command(subcommand)]
+        command: DepsCommands,
+    },
+
+    /// Manage developer roles (backend, frontend, ...)
+    Role {
+        #[command(subcommand)]
+        command: RoleCommands,
+    },
+
+    /// Attach git commits as proof of work for a task
+    Proof {
+        #[command(subcommand)]
+        command: ProofCommands,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell: bash, zsh, fish
@@ -301,4 +355,57 @@ pub enum ExportFormat {
     Json,
     Csv,
     Markdown,
+}
+
+#[derive(Subcommand)]
+pub enum DepsCommands {
+    /// Add a dependency: <task_id> depends on <on>
+    Add {
+        /// Task that gains a dependency
+        task_id: i64,
+        /// Task it depends on
+        on: i64,
+    },
+    /// Remove a dependency
+    Remove { task_id: i64, on: i64 },
+    /// List direct dependencies of a task
+    List { task_id: i64 },
+    /// List tasks that depend on this one (its dependents)
+    Dependents { task_id: i64 },
+    /// Show the full dependency tree of a task
+    Tree { task_id: i64 },
+}
+
+#[derive(Subcommand)]
+pub enum RoleCommands {
+    /// Set a developer's role
+    Set {
+        username: String,
+        /// Role name (free-form, e.g. backend, frontend, devops, qa)
+        role: String,
+    },
+    /// Remove a developer's role
+    Remove { username: String },
+    /// Get a developer's role
+    Get { username: String },
+    /// List all developer roles
+    List,
+}
+
+#[derive(Subcommand)]
+pub enum ProofCommands {
+    /// Attach a commit as proof for a task
+    Add {
+        task_id: i64,
+        /// Commit hash (full or short). Resolved via `git`.
+        commit: String,
+    },
+    /// Auto-import commits from the task's branch (HEAD..base)
+    Auto { task_id: i64 },
+    /// List proofs attached to a task
+    List { task_id: i64 },
+    /// Remove a proof
+    Remove { task_id: i64, commit: String },
+    /// Verify all proofs still resolve in the local git repo
+    Verify { task_id: i64 },
 }

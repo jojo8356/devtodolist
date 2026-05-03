@@ -4,10 +4,10 @@ use dialoguer::Confirm;
 use crate::commands::init::find_db;
 use crate::error::Result;
 
-pub fn run(id: i64, force: bool) -> Result<()> {
-    let db = find_db()?;
+pub async fn run(id: i64, force: bool) -> Result<()> {
+    let db = find_db().await?;
 
-    let task = db.get_task(id)?;
+    let task = db.get_task(id).await?;
 
     if !force {
         let confirm = Confirm::new()
@@ -22,7 +22,7 @@ pub fn run(id: i64, force: bool) -> Result<()> {
         }
     }
 
-    db.delete_task(id)?;
+    db.delete_task(id).await?;
 
     println!(
         "{} Deleted task #{} — {}",

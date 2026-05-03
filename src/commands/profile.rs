@@ -9,13 +9,12 @@ use crate::gamification::{self, Achievement, MAX_LEVEL};
 
 const BAR_WIDTH: usize = 20;
 
-/// Entry point for `devtodo profile`. Loads the gamification profile from
-/// the database and prints a formatted summary.
-pub fn run() -> Result<()> {
-    let db = find_db()?;
-    let profile = db.get_profile()?;
+pub async fn run() -> Result<()> {
+    let db = find_db().await?;
+    let profile = db.get_profile().await?;
     let unlocked: std::collections::HashSet<String> = db
-        .list_unlocked_achievements()?
+        .list_unlocked_achievements()
+        .await?
         .into_iter()
         .map(|(name, _)| name)
         .collect();
@@ -33,7 +32,6 @@ pub fn run() -> Result<()> {
     println!("{}", "╚══════════════════════════════════════╝".purple());
     println!();
 
-    // Level line
     println!(
         "{}   {}  /  {}",
         "Level".bold(),
@@ -41,7 +39,6 @@ pub fn run() -> Result<()> {
         MAX_LEVEL
     );
 
-    // XP bar
     let filled = if span > 0 {
         ((into as f64 / span as f64) * BAR_WIDTH as f64).round() as usize
     } else {
@@ -73,7 +70,6 @@ pub fn run() -> Result<()> {
     }
     println!();
 
-    // Streaks & totals
     println!(
         "{}  {} 🔥    {}  {} 🔥",
         "Current streak".bold(),
@@ -88,7 +84,6 @@ pub fn run() -> Result<()> {
     );
     println!();
 
-    // Achievements
     let total = Achievement::ALL.len();
     let earned = Achievement::ALL
         .iter()

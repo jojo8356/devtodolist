@@ -273,21 +273,21 @@ fn update_streak(profile: &mut Profile, today: NaiveDate) -> bool {
 
 /// Award XP, update streak and unlock any newly-earned achievements for a
 /// completed task. Persists the updated profile and achievement rows.
-pub fn award_task_completion(
+pub async fn award_task_completion(
     db: &Database,
     priority: Option<&Priority>,
 ) -> Result<CompletionReward> {
-    award_task_completion_on(db, priority, Local::now().date_naive())
+    award_task_completion_on(db, priority, Local::now().date_naive()).await
 }
 
 /// Variant of [`award_task_completion`] that takes the completion date
 /// explicitly, to keep the logic deterministic in tests.
-pub fn award_task_completion_on(
+pub async fn award_task_completion_on(
     db: &Database,
     priority: Option<&Priority>,
     today: NaiveDate,
 ) -> Result<CompletionReward> {
-    let mut profile = db.get_profile()?;
+    let mut profile = db.get_profile().await?;
 
     let xp_gained = xp_for_priority(priority);
     let old_level = profile.level;
@@ -298,13 +298,13 @@ pub fn award_task_completion_on(
 
     let streak_extended = update_streak(&mut profile, today);
 
-    db.save_profile(&profile)?;
+    db.save_profile(&profile).await?;
 
     // Evaluate achievements based on the freshly updated profile.
     let mut new_achievements = Vec::new();
     for ach in Achievement::ALL {
-        if ach.is_earned(&profile) && !db.is_achievement_unlocked(ach.key())? {
-            db.unlock_achievement(ach.key())?;
+        if ach.is_earned(&profile) && !db.is_achievement_unlocked(ach.key()).await? {
+            db.unlock_achievement(ach.key()).await?;
             new_achievements.push(*ach);
         }
     }

@@ -210,6 +210,35 @@ pub struct Reviewer {
 
 // ── Comment ──
 
+// ── Dev Role ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DevRole {
+    pub username: String,
+    pub role: String,
+}
+
+// ── Task Dependency ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDependency {
+    pub task_id: i64,
+    pub depends_on: i64,
+}
+
+// ── Commit Proof ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitProof {
+    pub task_id: i64,
+    pub commit_hash: String,
+    pub short_hash: Option<String>,
+    pub author: Option<String>,
+    pub message: Option<String>,
+    pub committed_at: Option<String>,
+    pub added_at: NaiveDateTime,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
     pub id: i64,

@@ -23,7 +23,6 @@ fn detect_repo() -> Result<String> {
 
     let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    // Parse owner/repo from various URL formats
     let repo = url
         .trim_end_matches(".git")
         .rsplit('/')
@@ -34,7 +33,6 @@ fn detect_repo() -> Result<String> {
         .collect::<Vec<_>>();
 
     if repo.len() == 2 {
-        // Handle SSH format: extract owner from "host:owner"
         let owner = repo[0].rsplit(':').next().unwrap_or(repo[0]);
         Ok(format!("{}/{}", owner, repo[1]))
     } else {
@@ -88,13 +86,8 @@ fn map_remote_status(status: &str) -> TaskStatus {
     }
 }
 
-pub fn run_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
-    let rt = tokio::runtime::Handle::current();
-    rt.block_on(async_sync(provider_arg, dry_run))
-}
-
-async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
-    let db = find_db()?;
+pub async fn run_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
+    let db = find_db().await?;
     let (provider, token) = resolve_provider(provider_arg)?;
     let api = build_api(&provider, &token)?;
     let repo = detect_repo()?;
@@ -114,12 +107,11 @@ async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
     let mut updated = 0u32;
 
     for rpr in &remote_prs {
-        // Check if we already track this PR
-        let existing = db.list_tasks(None, None, None, None, None, None)?;
+        let existing = db.list_tasks(None, None, None, None, None, None).await?;
 
-        let local = existing
-            .iter()
-            .find(|t| t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id));
+        let local = existing.iter().find(|t| {
+            t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id)
+        });
 
         if let Some(task) = local {
             let new_status = map_remote_status(&rpr.status);
@@ -133,10 +125,13 @@ async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
                         new_status
                     );
                 } else {
-                    db.update_task_field(task.id, "status", Some(new_status.as_str()))?;
-                    db.update_task_field(task.id, "title", Some(&rpr.title))?;
+                    db.update_task_field(task.id, "status", Some(new_status.as_str()))
+                        .await?;
+                    db.update_task_field(task.id, "title", Some(&rpr.title))
+                        .await?;
                     if let Some(ref desc) = rpr.description {
-                        db.update_task_field(task.id, "description", Some(desc))?;
+                        db.update_task_field(task.id, "description", Some(desc))
+                            .await?;
                     }
                 }
                 updated += 1;
@@ -150,7 +145,7 @@ async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
                     rpr.title
                 );
             } else {
-                import_remote_pr(&db, &provider, rpr)?;
+                import_remote_pr(&db, &provider, rpr).await?;
             }
             created += 1;
         }
@@ -178,57 +173,58 @@ async fn async_sync(provider_arg: Option<&str>, dry_run: bool) -> Result<()> {
     Ok(())
 }
 
-fn import_remote_pr(db: &crate::db::Database, provider: &Provider, rpr: &RemotePr) -> Result<()> {
+async fn import_remote_pr(
+    db: &crate::db::Database,
+    provider: &Provider,
+    rpr: &RemotePr,
+) -> Result<()> {
     let status = map_remote_status(&rpr.status);
 
-    let id = db.insert_task(
-        &rpr.title,
-        rpr.description.as_deref(),
-        &status,
-        None,
-        rpr.branch.as_deref(),
-        rpr.base_branch.as_deref(),
-        rpr.author.as_deref(),
-    )?;
+    let id = db
+        .insert_task(
+            &rpr.title,
+            rpr.description.as_deref(),
+            &status,
+            None,
+            rpr.branch.as_deref(),
+            rpr.base_branch.as_deref(),
+            rpr.author.as_deref(),
+        )
+        .await?;
 
-    db.update_task_field(id, "provider", Some(provider.as_str()))?;
-    db.update_task_field(id, "remote_id", Some(&rpr.remote_id.to_string()))?;
-    db.update_task_field(id, "source_url", Some(&rpr.source_url))?;
+    db.update_task_field(id, "provider", Some(provider.as_str()))
+        .await?;
+    db.update_task_field(id, "remote_id", Some(&rpr.remote_id.to_string()))
+        .await?;
+    db.update_task_field(id, "source_url", Some(&rpr.source_url))
+        .await?;
 
-    // Import labels
     for label_name in &rpr.labels {
-        if db.get_label_by_name(label_name).is_err() {
-            db.insert_label(label_name, None)?;
+        if db.get_label_by_name(label_name).await.is_err() {
+            db.insert_label(label_name, None).await?;
         }
-        db.assign_label(id, label_name)?;
+        db.assign_label(id, label_name).await?;
     }
 
-    // Import reviewers
     for reviewer in &rpr.reviewers {
-        db.assign_reviewer(id, &reviewer.username)?;
+        db.assign_reviewer(id, &reviewer.username).await?;
         if reviewer.status != "pending"
             && let Ok(rs) = reviewer.status.parse()
         {
-            db.update_review_status(id, &reviewer.username, &rs)?;
+            db.update_review_status(id, &reviewer.username, &rs).await?;
         }
     }
 
-    // Import comments
     for comment in &rpr.comments {
-        db.insert_comment(id, &comment.author, &comment.body)?;
+        db.insert_comment(id, &comment.author, &comment.body).await?;
     }
 
     Ok(())
 }
 
-pub fn run_push(id: i64) -> Result<()> {
-    let rt = tokio::runtime::Handle::current();
-    rt.block_on(async_push(id))
-}
-
-async fn async_push(id: i64) -> Result<()> {
-    let db = find_db()?;
-    let task = db.get_task(id)?;
+pub async fn run_push(id: i64) -> Result<()> {
+    let db = find_db().await?;
+    let task = db.get_task(id).await?;
 
     let provider = if let Some(ref p) = task.provider {
         (
@@ -243,11 +239,10 @@ async fn async_push(id: i64) -> Result<()> {
     let api = build_api(&provider.0, &provider.1)?;
     let repo = detect_repo()?;
 
-    let branch = task.branch.as_deref().ok_or_else(|| {
-        DevTodoError::Config(format!(
-            "Task #{id} has no branch set. Use `devtodo edit {id} --branch <name>`"
-        ))
-    })?;
+    let branch = task
+        .branch
+        .as_deref()
+        .ok_or(DevTodoError::NoBranch(id))?;
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -257,7 +252,6 @@ async fn async_push(id: i64) -> Result<()> {
     );
 
     if let Some(remote_id) = task.remote_id {
-        // Update existing PR
         pb.set_message(format!("Updating PR #{remote_id} on {}...", provider.0));
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
@@ -273,17 +267,18 @@ async fn async_push(id: i64) -> Result<()> {
             task.source_url.as_deref().unwrap_or("")
         );
     } else {
-        // Create new PR
         pb.set_message(format!("Creating PR on {}...", provider.0));
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
         let labels = db
-            .get_labels_for_task(id)?
+            .get_labels_for_task(id)
+            .await?
             .into_iter()
             .map(|l| l.name)
             .collect();
         let reviewers = db
-            .list_reviewers(id)?
+            .list_reviewers(id)
+            .await?
             .into_iter()
             .map(|r| r.username)
             .collect();
@@ -304,10 +299,12 @@ async fn async_push(id: i64) -> Result<()> {
         let remote_pr = api.create_pr(&repo, &req).await?;
         pb.finish_and_clear();
 
-        // Update local task with remote info
-        db.update_task_field(id, "provider", Some(provider.0.as_str()))?;
-        db.update_task_field(id, "remote_id", Some(&remote_pr.remote_id.to_string()))?;
-        db.update_task_field(id, "source_url", Some(&remote_pr.source_url))?;
+        db.update_task_field(id, "provider", Some(provider.0.as_str()))
+            .await?;
+        db.update_task_field(id, "remote_id", Some(&remote_pr.remote_id.to_string()))
+            .await?;
+        db.update_task_field(id, "source_url", Some(&remote_pr.source_url))
+            .await?;
 
         println!(
             "{} Created PR #{} on {} — {}",
@@ -321,13 +318,8 @@ async fn async_push(id: i64) -> Result<()> {
     Ok(())
 }
 
-pub fn run_pull(provider_arg: Option<&str>, repo_arg: Option<&str>, state: &str) -> Result<()> {
-    let rt = tokio::runtime::Handle::current();
-    rt.block_on(async_pull(provider_arg, repo_arg, state))
-}
-
-async fn async_pull(provider_arg: Option<&str>, repo_arg: Option<&str>, state: &str) -> Result<()> {
-    let db = find_db()?;
+pub async fn run_pull(provider_arg: Option<&str>, repo_arg: Option<&str>, state: &str) -> Result<()> {
+    let db = find_db().await?;
     let (provider, token) = resolve_provider(provider_arg)?;
     let api = build_api(&provider, &token)?;
 
@@ -351,16 +343,15 @@ async fn async_pull(provider_arg: Option<&str>, repo_arg: Option<&str>, state: &
     let mut skipped = 0u32;
 
     for rpr in &remote_prs {
-        // Check if already tracked
-        let existing = db.list_tasks(None, None, None, None, None, None)?;
-        let already = existing
-            .iter()
-            .any(|t| t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id));
+        let existing = db.list_tasks(None, None, None, None, None, None).await?;
+        let already = existing.iter().any(|t| {
+            t.provider.as_ref() == Some(&provider) && t.remote_id == Some(rpr.remote_id)
+        });
 
         if already {
             skipped += 1;
         } else {
-            import_remote_pr(&db, &provider, rpr)?;
+            import_remote_pr(&db, &provider, rpr).await?;
             imported += 1;
         }
     }

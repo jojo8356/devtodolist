@@ -8,7 +8,7 @@ use crate::error::Result;
 
 const DB_FILE: &str = ".devtodo.db";
 
-pub fn run() -> Result<()> {
+pub async fn run() -> Result<()> {
     if Path::new(DB_FILE).exists() {
         println!(
             "{} {} already exists in this directory.",
@@ -17,8 +17,8 @@ pub fn run() -> Result<()> {
         );
     }
 
-    let db = Database::open(DB_FILE)?;
-    db.init()?;
+    let db = Database::open(DB_FILE).await?;
+    db.init().await?;
 
     println!(
         "{} Initialized devtodo database ({})",
@@ -39,11 +39,15 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-pub fn find_db() -> Result<Database> {
+pub async fn find_db() -> Result<Database> {
     if !Path::new(DB_FILE).exists() {
         return Err(crate::error::DevTodoError::Config(
             "No .devtodo.db found. Run `devtodo init` first.".into(),
         ));
     }
-    Database::open(DB_FILE)
+    let db = Database::open(DB_FILE).await?;
+    // Apply any pending migrations on every open. This makes upgrades
+    // automatic for existing project DBs.
+    db.init().await?;
+    Ok(db)
 }

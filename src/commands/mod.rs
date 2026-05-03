@@ -1,13 +1,17 @@
 pub mod add;
 pub mod config;
+pub mod dateparse;
 pub mod delete;
+pub mod deps;
 pub mod edit;
 pub mod export;
 pub mod init;
 pub mod label;
 pub mod list;
 pub mod profile;
+pub mod proof;
 pub mod review;
+pub mod role;
 pub mod show;
 pub mod stats;
 pub mod status;

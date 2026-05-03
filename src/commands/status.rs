@@ -6,16 +6,14 @@ use crate::error::Result;
 use crate::gamification;
 use crate::models::TaskStatus;
 
-pub fn run(id: i64, status: &str) -> Result<()> {
-    let db = find_db()?;
+pub async fn run(id: i64, status: &str) -> Result<()> {
+    let db = find_db().await?;
 
-    // Validate status
     let new_status: TaskStatus = status.parse()?;
+    let task = db.get_task(id).await?;
 
-    // Verify task exists
-    let task = db.get_task(id)?;
-
-    db.update_task_field(id, "status", Some(new_status.as_str()))?;
+    db.update_task_field(id, "status", Some(new_status.as_str()))
+        .await?;
 
     println!(
         "{} Task #{}: {} -> {}",
@@ -25,9 +23,8 @@ pub fn run(id: i64, status: &str) -> Result<()> {
         colorize_status(&new_status),
     );
 
-    // Gamification: award XP when a task is merged for the first time.
     if new_status == TaskStatus::Merged && task.status != TaskStatus::Merged {
-        let reward = gamification::award_task_completion(&db, task.priority.as_ref())?;
+        let reward = gamification::award_task_completion(&db, task.priority.as_ref()).await?;
         print_reward_banner(&reward);
     }
 
@@ -57,7 +54,6 @@ fn print_reward_banner(reward: &gamification::CompletionReward) {
     }
 
     if reward.leveled_up {
-        // \x07 = ASCII BEL, a classic terminal SFX.
         println!(
             "\x07  {}  {} {} -> {}",
             "★".yellow().bold(),

@@ -7,9 +7,11 @@ use crate::cli::ExportFormat;
 use crate::commands::init::find_db;
 use crate::error::Result;
 
-pub fn run(format: &ExportFormat, output: Option<&str>, status: Option<&str>) -> Result<()> {
-    let db = find_db()?;
-    let tasks = db.list_tasks(status, None, None, None, Some("created"), None)?;
+pub async fn run(format: &ExportFormat, output: Option<&str>, status: Option<&str>) -> Result<()> {
+    let db = find_db().await?;
+    let tasks = db
+        .list_tasks(status, None, None, None, Some("created"), None)
+        .await?;
 
     let content = match format {
         ExportFormat::Json => serde_json::to_string_pretty(&tasks)?,

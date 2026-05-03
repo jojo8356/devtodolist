@@ -6,13 +6,13 @@ use crate::display;
 use crate::error::Result;
 use crate::models::ReviewStatus;
 
-pub fn run(command: &ReviewCommands) -> Result<()> {
-    let db = find_db()?;
+pub async fn run(command: &ReviewCommands) -> Result<()> {
+    let db = find_db().await?;
 
     match command {
         ReviewCommands::Assign { task_id, username } => {
-            let _ = db.get_task(*task_id)?;
-            db.assign_reviewer(*task_id, username)?;
+            let _ = db.get_task(*task_id).await?;
+            db.assign_reviewer(*task_id, username).await?;
             println!(
                 "{} Assigned reviewer '{}' to task #{}",
                 "✓".green().bold(),
@@ -21,7 +21,7 @@ pub fn run(command: &ReviewCommands) -> Result<()> {
             );
         }
         ReviewCommands::Remove { task_id, username } => {
-            db.remove_reviewer(*task_id, username)?;
+            db.remove_reviewer(*task_id, username).await?;
             println!(
                 "{} Removed reviewer '{}' from task #{}",
                 "✓".green().bold(),
@@ -35,7 +35,8 @@ pub fn run(command: &ReviewCommands) -> Result<()> {
             status,
         } => {
             let review_status: ReviewStatus = status.parse()?;
-            db.update_review_status(*task_id, username, &review_status)?;
+            db.update_review_status(*task_id, username, &review_status)
+                .await?;
             println!(
                 "{} Updated review for '{}' on task #{}: {}",
                 "✓".green().bold(),
@@ -45,8 +46,8 @@ pub fn run(command: &ReviewCommands) -> Result<()> {
             );
         }
         ReviewCommands::List { task_id } => {
-            let _ = db.get_task(*task_id)?;
-            let reviewers = db.list_reviewers(*task_id)?;
+            let _ = db.get_task(*task_id).await?;
+            let reviewers = db.list_reviewers(*task_id).await?;
             display::print_reviewers_table(&reviewers);
         }
     }
