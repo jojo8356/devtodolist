@@ -1,6 +1,6 @@
 [package]
 name = "devtodo"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A developer todolist CLI where each task is a pull request"
 
